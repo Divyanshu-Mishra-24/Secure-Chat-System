@@ -2,9 +2,11 @@ import sqlite3
 import os
 from pathlib import Path
 
-DB_PATH = Path(__file__).parent / "signal.db"
-UPLOADS_DIR = Path(__file__).parent / "uploads"
-UPLOADS_DIR.mkdir(exist_ok=True)
+DATA_DIR = Path(os.getenv("DATA_DIR", Path(__file__).parent / "data"))
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+DB_PATH = DATA_DIR / "signal.db"
+UPLOADS_DIR = DATA_DIR / "uploads"
+UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 
 def get_db():
     conn = sqlite3.connect(DB_PATH, check_same_thread=False)

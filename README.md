@@ -40,7 +40,7 @@ Install **Python 3.10 or newer**, **Node.js 18.17 or newer**, and npm. No separa
 
 ## Run from a fresh checkout
 
-The frontend currently expects the API at `http://localhost:8000` and the WebSocket at `ws://localhost:8000`, so run both services on the same computer using those ports.
+By default, the frontend uses the API at `http://localhost:8000` and the WebSocket at `ws://localhost:8000`. These defaults support local development. For deployment, configure `NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_WS_URL` as described below.
 
 ### Windows quick start
 
@@ -169,10 +169,34 @@ All REST routes are under `/api` and most require a valid session cookie.
 
 The WebSocket endpoint is `/ws/{user_id}`. It authenticates using the same session cookie; relevant events include `new_message`, `message_status`, `messages_read`, `typing_status`, `reaction_update`, and `user_presence`.
 
+## Deployment configuration
+
+The frontend reads public API settings at build time. Copy `frontend/.env.example` to `frontend/.env.local` for local overrides, or set these variables in the frontend hosting provider before building:
+
+| Variable | Example | Purpose |
+| --- | --- | --- |
+| `NEXT_PUBLIC_API_URL` | `https://secure-chat-system.onrender.com` | Backend origin; do not append `/api`. |
+| `NEXT_PUBLIC_WS_URL` | `wss://secure-chat-system.onrender.com/ws` | WebSocket base; keep the `/ws` path. |
+
+The WebSocket URL defaults from the API URL when omitted, converting `https` to `wss` (and `http` to `ws`) and adding `/ws`.
+
+Set these backend environment variables in the backend hosting provider. `backend/.env.example` lists the production values for the Render domains in this project:
+
+| Variable | Example | Purpose |
+| --- | --- | --- |
+| `FRONTEND_ORIGINS` | `https://secure-chat-system-frontend.onrender.com` | Comma-separated browser frontend origins allowed by CORS. Do not include the backend URL. Localhost origins are also allowed. |
+| `PUBLIC_API_URL` | `https://secure-chat-system.onrender.com` | Public backend origin used to build attachment URLs. |
+| `COOKIE_SECURE` | `true` | Sends the HTTP-only session cookie only over HTTPS. Set this to `true` in production. |
+| `COOKIE_SAMESITE` | `none` | Allows the cookie on cross-site frontend-to-backend requests. `none` requires `COOKIE_SECURE=true`. |
+
+All authenticated REST calls use `credentials: "include"`; the WebSocket uses the browser's session cookie. The backend CORS middleware allows credentials and the configured frontend origin. Set both frontend and backend URLs to your actual deployed hosts if they differ from the examples. The frontend variables are public values and must not contain secrets.
+
+Deploy the backend with persistent storage mounted for `backend/signal.db` and `backend/uploads` if account data and uploaded files must survive redeploys. The current SQLite database and local upload directory are single-instance storage; this project does not configure a managed database or object store.
+
 ## Configuration and assumptions
 
-- API and WebSocket URLs are currently set to localhost in the frontend (`frontend/app/page.tsx` and several components). Changing ports or deploying the frontend and backend separately requires updating those URLs and the CORS allowlist in `backend/main.py`.
-- The session cookie is configured with `secure=False` for local HTTP development. Production hosting must use HTTPS and set secure cookie settings, trusted origins, and appropriate deployment secrets.
+- Local API and WebSocket defaults are `http://localhost:8000` and `ws://localhost:8000/ws`; deployment overrides use the variables above.
+- The HTTP-only session cookie is insecure and `SameSite=Lax` by default for local HTTP. Production should explicitly set `COOKIE_SECURE=true` and `COOKIE_SAMESITE=none` when frontend and backend are hosted on separate sites.
 - The fixed OTP, demo safety-number display, local file storage, and lack of end-to-end encryption are deliberate demo assumptions, not production security guarantees.
 - SQLite and the in-memory WebSocket connection manager suit a single local server process. Multiple backend workers or distributed deployment would require shared persistence/broadcast infrastructure.
 - The seed loader skips all sample data if any user already exists; it does not partially seed a populated database.
