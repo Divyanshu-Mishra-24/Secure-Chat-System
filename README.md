@@ -78,7 +78,7 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000). The FastAPI interactive API reference is at [http://localhost:8000/docs](http://localhost:8000/docs).
 
-On the first backend startup, the app creates `backend/signal.db`, applies schema migrations, and seeds demo accounts and conversations only if the database has no users. To reset local demo data, stop the backend and remove `backend/signal.db`; uploaded files are stored separately in `backend/uploads`.
+On the first backend startup, the app creates `backend/data/signal.db`, applies schema migrations, and seeds demo accounts and conversations only if the database has no users. To reset local demo data, stop the backend and remove `backend/data/signal.db`; uploaded files are stored separately in `backend/data/uploads/`. Set `DATA_DIR` to choose another data directory.
 
 ## Try the demo
 
@@ -169,34 +169,36 @@ All REST routes are under `/api` and most require a valid session cookie.
 
 The WebSocket endpoint is `/ws/{user_id}`. It authenticates using the same session cookie; relevant events include `new_message`, `message_status`, `messages_read`, `typing_status`, `reaction_update`, and `user_presence`.
 
-## Deployment configuration
+## Railway deployment
 
-The frontend reads public API settings at build time. Copy `frontend/.env.example` to `frontend/.env.local` for local overrides, or set these variables in the frontend hosting provider before building:
+The Railway deployment runs the Next.js frontend, FastAPI backend, and Nginx reverse proxy together in one Docker service. The live application is [https://secure-chat-system-production.up.railway.app/](https://secure-chat-system-production.up.railway.app/). The same domain serves the frontend, REST API at `/api`, uploads at `/uploads`, and WebSockets at `/ws`; production builds therefore do not need separate `NEXT_PUBLIC_API_URL` or `NEXT_PUBLIC_WS_URL` values.
 
-| Variable | Example | Purpose |
-| --- | --- | --- |
-| `NEXT_PUBLIC_API_URL` | `https://secure-chat-system.onrender.com` | Backend origin; do not append `/api`. |
-| `NEXT_PUBLIC_WS_URL` | `wss://secure-chat-system.onrender.com/ws` | WebSocket base; keep the `/ws` path. |
+### Add persistent storage
 
-The WebSocket URL defaults from the API URL when omitted, converting `https` to `wss` (and `http` to `ws`) and adding `/ws`.
+Railway's container filesystem is not persistent across deployments. Attach a Railway Volume to the `Secure-Chat-System` service:
 
-Set these backend environment variables in the backend hosting provider. `backend/.env.example` lists the production values for the Render domains in this project:
+1. Open the project canvas and select **+ Add** → **Volume**.
+2. Set the mount path to `/app/data`. A 1 GB volume is ample for the current demo database and uploads; increase it if uploaded files grow.
+3. Create the volume and let Railway redeploy/restart the service.
 
-| Variable | Example | Purpose |
-| --- | --- | --- |
-| `FRONTEND_ORIGINS` | `https://secure-chat-system-frontend.onrender.com` | Comma-separated browser frontend origins allowed by CORS. Do not include the backend URL. Localhost origins are also allowed. |
-| `PUBLIC_API_URL` | `https://secure-chat-system.onrender.com` | Public backend origin used to build attachment URLs. |
-| `COOKIE_SECURE` | `true` | Sends the HTTP-only session cookie only over HTTPS. Set this to `true` in production. |
-| `COOKIE_SAMESITE` | `none` | Allows the cookie on cross-site frontend-to-backend requests. `none` requires `COOKIE_SECURE=true`. |
+The application stores its live data in `/app/data/signal.db` and `/app/data/uploads/`. Do not manually upload `signal.db` to Railway. On startup, `start.sh` copies the database bundled in the Docker image to `/app/data/signal.db` only when that volume does not already contain a database. It also copies bundled upload files into the volume without overwriting files already there. After this first initialization, the volume's database and uploads are authoritative and survive redeployments and restarts. Keep the Railway volume attached when deploying new versions.
 
-All authenticated REST calls use `credentials: "include"`; the WebSocket uses the browser's session cookie. The backend CORS middleware allows credentials and the configured frontend origin. Set both frontend and backend URLs to your actual deployed hosts if they differ from the examples. The frontend variables are public values and must not contain secrets.
+### Confirm the deployment and public URL
 
-Deploy the backend with persistent storage mounted for `backend/signal.db` and `backend/uploads` if account data and uploaded files must survive redeploys. The current SQLite database and local upload directory are single-instance storage; this project does not configure a managed database or object store.
+After the volume is attached, open the service's latest deployment and check **View Logs**. The container should start Uvicorn on `127.0.0.1:8000`, Next.js on `127.0.0.1:3000`, and Nginx on Railway's configured `$PORT`; the deployment should report successful/healthy startup. If Railway has not assigned a public domain yet, open **Settings → Networking → Public Networking** and choose **Generate Domain**. The current public URL is [secure-chat-system-production.up.railway.app](https://secure-chat-system-production.up.railway.app/).
+
+### Runtime settings and local development
+
+The container uses `DATA_DIR=/app/data`, `COOKIE_SECURE=true`, and `COOKIE_SAMESITE=lax` by default. Keep the cookie settings when serving the frontend and backend through the same HTTPS domain. `FRONTEND_ORIGINS` can be set to a comma-separated list of additional allowed browser origins if a separate frontend is introduced. `PUBLIC_API_URL` can be set to the public origin if attachment URLs must use an explicit hostname; otherwise, the backend uses the incoming request's host and forwarded HTTPS scheme. Railway provides `$PORT` for Nginx; the image defaults it to `8080` when running elsewhere.
+
+For local development, the frontend continues to use `http://localhost:8000` for the API and `ws://localhost:8000/ws` for WebSockets unless overridden in `frontend/.env.local`. Without `DATA_DIR`, the backend uses `backend/data/` for its local database and uploads. The deployment image separately includes the checked-in `backend/signal.db` and `backend/uploads/` as the initial data source.
+
+The Railway service uses one SQLite database and an in-memory WebSocket connection manager, so it is intended to run as a single application instance. Do not scale it to multiple replicas/workers without adding shared database and WebSocket coordination infrastructure.
 
 ## Configuration and assumptions
 
-- Local API and WebSocket defaults are `http://localhost:8000` and `ws://localhost:8000/ws`; deployment overrides use the variables above.
-- The HTTP-only session cookie is insecure and `SameSite=Lax` by default for local HTTP. Production should explicitly set `COOKIE_SECURE=true` and `COOKIE_SAMESITE=none` when frontend and backend are hosted on separate sites.
+- Local API and WebSocket defaults are `http://localhost:8000` and `ws://localhost:8000/ws`; the Railway Docker deployment uses same-domain `/api` and `/ws` routes.
+- The HTTP-only session cookie is insecure and `SameSite=Lax` by default for local HTTP. The Railway image enables `COOKIE_SECURE=true` and uses `COOKIE_SAMESITE=lax` for the same-site HTTPS deployment.
 - The fixed OTP, demo safety-number display, local file storage, and lack of end-to-end encryption are deliberate demo assumptions, not production security guarantees.
 - SQLite and the in-memory WebSocket connection manager suit a single local server process. Multiple backend workers or distributed deployment would require shared persistence/broadcast infrastructure.
 - The seed loader skips all sample data if any user already exists; it does not partially seed a populated database.
@@ -217,5 +219,8 @@ frontend/
   app/components/         Chat, navigation, contacts, auth, and modals
   app/styles.css          Application themes and component styles
   app/landing.css         Landing page styles
+Dockerfile                Combined Railway application image
+nginx.conf                Same-domain frontend/API/WebSocket routing
+start.sh                  Initial data copy and service startup
 run.bat                   Windows local development launcher
 ```
