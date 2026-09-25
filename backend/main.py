@@ -26,11 +26,14 @@ logger = logging.getLogger("signal_backend")
 
 app = FastAPI(title="Signal Messenger Clone API", version="1.0.0")
 
-# Enable CORS for localhost:3000
+# Frontend origins are configured as a comma-separated environment variable.
 origins = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
+    "https://secure-chat-system-frontend.onrender.com",
 ]
+origins.extend(origin.strip().rstrip("/") for origin in os.getenv("FRONTEND_ORIGINS", "").split(",") if origin.strip())
+origins = list(dict.fromkeys(origins))
 
 app.add_middleware(
     CORSMiddleware,
@@ -933,7 +936,7 @@ async def mark_read(conv_id: int, current_user: dict = Depends(get_current_user)
 # -------------------------------------------------------------------
 
 @app.post("/api/upload")
-async def upload_file(file: UploadFile = File(...)):
+async def upload_file(request: Request, file: UploadFile = File(...)):
     ext = Path(file.filename).suffix
     unique_name = f"{uuid.uuid4().hex}{ext}"
     dest_path = UPLOADS_DIR / unique_name
@@ -941,7 +944,8 @@ async def upload_file(file: UploadFile = File(...)):
     with dest_path.open("wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
-    file_url = f"http://localhost:8000/uploads/{unique_name}"
+    public_api_url = os.getenv("PUBLIC_API_URL", str(request.base_url).rstrip("/"))
+    file_url = f"{public_api_url.rstrip('/')}/uploads/{unique_name}"
     file_type = "image" if file.content_type.startswith("image/") else "audio" if file.content_type.startswith("audio/") else "video" if file.content_type.startswith("video/") else "file"
 
     return {

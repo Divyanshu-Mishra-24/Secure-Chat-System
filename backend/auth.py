@@ -3,10 +3,17 @@ import secrets
 from datetime import datetime, timedelta
 from fastapi import Request, Response, HTTPException, status, Depends
 import sqlite3
+import os
 from database import get_db
 
 SESSION_EXPIRE_DAYS = 14
 COOKIE_NAME = "signal_session"
+COOKIE_SECURE = os.getenv("COOKIE_SECURE", "true" if os.getenv("RENDER") else "false").lower() in {"1", "true", "yes"}
+COOKIE_SAMESITE = os.getenv("COOKIE_SAMESITE", "none" if COOKIE_SECURE else "lax").lower()
+if COOKIE_SAMESITE not in {"lax", "strict", "none"}:
+    raise ValueError("COOKIE_SAMESITE must be 'lax', 'strict', or 'none'")
+if COOKIE_SAMESITE == "none" and not COOKIE_SECURE:
+    raise ValueError("COOKIE_SECURE must be true when COOKIE_SAMESITE is 'none'")
 
 def hash_token(token: str) -> str:
     return hashlib.sha256(token.encode('utf-8')).hexdigest()
@@ -32,8 +39,8 @@ def create_session(db: sqlite3.Connection, user_id: int, response: Response) -> 
         value=token,
         max_age=SESSION_EXPIRE_DAYS * 24 * 3600,
         httponly=True,
-        samesite="lax",
-        secure=False # Set to True in HTTPS production
+        samesite=COOKIE_SAMESITE,
+        secure=COOKIE_SECURE,
     )
     return token
 

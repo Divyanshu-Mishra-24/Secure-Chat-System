@@ -5,6 +5,7 @@ import {
   Lock, ShieldCheck, ArrowRight, User, Phone, CheckCircle, Sparkles,
   Sun, Moon, MessageSquare, Video, Mic, CheckCheck, X, Shield, Users
 } from "lucide-react";
+import { API_BASE } from "../utils/api";
 
 type UserType = {
   id: number;
@@ -37,7 +38,7 @@ export default function AuthModal({ onLoginSuccess }: AuthModalProps) {
   const [busy, setBusy] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark">("light");
 
-  const API = "http://localhost:8000/api/auth";
+  const API = `${API_BASE}/auth`;
 
   useEffect(() => {
     const value = identifier.trim();

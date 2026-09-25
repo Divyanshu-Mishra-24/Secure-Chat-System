@@ -6,6 +6,7 @@ import {
   Video, VideoOff, LogOut, Moon, Sun, CheckCircle, Bell, Lock, User, Search, Trash2, Plus,
   MessageSquare, Info
 } from "lucide-react";
+import { API_BASE } from "../utils/api";
 
 function useModalEscape(onClose: () => void) {
   useEffect(() => {
@@ -118,7 +119,7 @@ export function NewMessageModal({
 
     let cancelled = false;
     const timer = setTimeout(() => {
-      fetch(`http://localhost:8000/api/users/search?q=${encodeURIComponent(normalizedQuery)}`, { credentials: "include" })
+      fetch(`${API_BASE}/users/search?q=${encodeURIComponent(normalizedQuery)}`, { credentials: "include" })
         .then((response) => response.ok ? response.json() : null)
         .then((data) => {
           if (!cancelled) setUsers(Array.isArray(data?.users) ? data.users : []);
@@ -209,7 +210,7 @@ export function NewGroupModal({
 
   // Fetch all registered users if contacts list is small or empty
   useEffect(() => {
-    fetch(`http://localhost:8000/api/users/search?q=${encodeURIComponent(searchQuery)}`, { credentials: "include" })
+    fetch(`${API_BASE}/users/search?q=${encodeURIComponent(searchQuery)}`, { credentials: "include" })
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (data?.users) {
@@ -620,7 +621,7 @@ export function GroupInfoModal({
       setSearchResults([]);
       return;
     }
-    fetch(`http://localhost:8000/api/users/search?q=${encodeURIComponent(searchMember.trim())}`, { credentials: "include" })
+    fetch(`${API_BASE}/users/search?q=${encodeURIComponent(searchMember.trim())}`, { credentials: "include" })
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (data?.users) {
@@ -635,7 +636,7 @@ export function GroupInfoModal({
   async function handleAddMember(userId: number) {
     setIsAdding(true);
     try {
-      const res = await fetch(`http://localhost:8000/api/conversations/${conversation.id}/members`, {
+      const res = await fetch(`${API_BASE}/conversations/${conversation.id}/members`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -655,7 +656,7 @@ export function GroupInfoModal({
 
   async function handleRemoveMember(userId: number) {
     try {
-      const res = await fetch(`http://localhost:8000/api/conversations/${conversation.id}/members/${userId}`, {
+      const res = await fetch(`${API_BASE}/conversations/${conversation.id}/members/${userId}`, {
         method: "DELETE",
         credentials: "include",
       });

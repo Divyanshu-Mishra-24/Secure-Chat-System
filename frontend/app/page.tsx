@@ -13,9 +13,7 @@ import {
 } from "./components/Modals";
 import { MessageSquare, UserPlus, Users, ShieldCheck } from "lucide-react";
 import { parseProjectTimestamp } from "./utils/dateTime";
-
-const API_BASE = "http://localhost:8000/api";
-const WS_BASE = "ws://localhost:8000/ws";
+import { API_BASE, WS_BASE } from "./utils/api";
 
 export default function Home() {
   const [currentUser, setCurrentUser] = useState<any | null>(null);

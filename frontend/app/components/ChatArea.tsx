@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { Conversation } from "./Sidebar";
 import { formatKolkataShortDate, formatKolkataTime, isSameKolkataDay, kolkataDateKey, parseProjectTimestamp, PROJECT_TIME_ZONE } from "../utils/dateTime";
+import { API_BASE } from "../utils/api";
 
 export interface Message {
   id: number;
@@ -139,8 +140,9 @@ export default function ChatArea({
     formData.append("file", file);
 
     try {
-      const res = await fetch("http://localhost:8000/api/upload", {
+      const res = await fetch(`${API_BASE}/upload`, {
         method: "POST",
+        credentials: "include",
         body: formData,
       });
       const data = await res.json();
